@@ -18,12 +18,14 @@ app.use(cors());
 
 const rooms = {};
 
+// ルーム作成エンドポイント
 app.post("/api/create-room", function (req, res) {
-  const { roomName, username } = req.body;
+  const { roomName, username, gameType } = req.body; // gameTypeでゲームの種類を受け取る
   const roomId = uuidv4().substring(0, 6);
   const userId = uuidv4().substring(0, 6);
   rooms[roomId] = {
     roomName,
+		gameType,
     users: [{ id: userId, username }],
   };
   res.json({ roomId, userId });
@@ -31,10 +33,11 @@ app.post("/api/create-room", function (req, res) {
   console.log(`${username}さんが部屋${roomId}に入室しました。`);
 });
 
+// ルーム参加エンドポイント
 app.post("/api/join-room", function (req, res) {
-  const { roomName, username } = req.body;
+  const { roomName, username, gameType } = req.body;
   const roomId = Object.keys(rooms).find(
-    (roomId) => rooms[roomId].roomName === roomName
+		(roomId) => rooms[roomId].roomName === roomName && rooms[roomId].gameType === gameType //  gameTypeでフィルタリング
   );
   if (roomId) {
     const userId = uuidv4().substring(0, 6);
@@ -47,6 +50,7 @@ app.post("/api/join-room", function (req, res) {
   }
 });
 
+// ルーム退出エンドポイント 
 app.post("/api/leave-room", function (req, res) {
   const { roomId, userId } = req.body;
   const room = rooms[roomId];
