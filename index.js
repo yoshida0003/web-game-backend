@@ -8,13 +8,13 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "https://game.yospace.org",
+    origin: ["https://game.yospace.org", "http://localhost:3000"],
     methods: ["GET", "POST"],
     credentials: true,
   },
   transports: ["websocket", "polling"],
-  pingTimeout: 30000, // タイムアウトを30秒に延長
-  pingInterval: 25000, // 25秒ごとにpingを送信
+  pingTimeout: 20000, // タイムアウトを30秒に延長
+  pingInterval: 1000, // 25秒ごとにpingを送信
 });
 
 app.use(express.json());
