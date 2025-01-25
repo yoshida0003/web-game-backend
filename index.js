@@ -7,12 +7,14 @@ const cors = require("cors");
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-	cors: {
-		origin: "https://game.yospace.org", // クライアントのURL
-		methods: ["GET", "POST"],
-		credentials: true,
-	},
-	transports: ["websocket", "polling"],
+  cors: {
+    origin: "https://game.yospace.org",
+    methods: ["GET", "POST"],
+    credentials: true,
+  },
+  transports: ["websocket", "polling"],
+  pingTimeout: 30000, // タイムアウトを30秒に延長
+  pingInterval: 25000, // 25秒ごとにpingを送信
 });
 
 app.use(express.json());
