@@ -103,26 +103,47 @@ app.get("/api/room/:roomId", function (req, res) {
 
 // Socket.ioのイベント処理
 io.on("connection", (socket) => {
-	console.log("ユーザーが接続しました");
-	socket.emit("server-log", "ユーザーが接続しました");
+  console.log("ユーザーが接続しました: SocketID =", socket.id);
 
-	socket.on("join-room", ({ roomId, userId, username }) => {
-		socket.join(roomId);
-		console.log(`${username}さんが部屋${roomId}に参加しました`);
-		io.to(roomId).emit("server-log", `${username}さんが部屋${roomId}に参加しました`);
-	});
+  socket.on("join-room", ({ roomId, userId, username }) => {
+    console.log(`join-roomイベント受信:`, { roomId, userId, username });
 
-	socket.on("leave-room", ({ roomId, userId, username }) => {
-		socket.leave(roomId);
-		console.log(`ユーザーID: ${userId}が部屋${roomId}から退出しました`);
-		io.to(roomId).emit("server-log", `ユーザーID: ${userId}が部屋${roomId}から退出しました`);
-	});
+    if (!rooms[roomId]) {
+      console.warn(`ルームが存在しません: RoomID = ${roomId}`);
+      socket.emit("server-log", "ルームが存在しません");
+      return;
+    }
 
-	socket.on("disconnect", () => {
-		console.log("ユーザーが切断しました");
-		socket.emit("server-log", "ユーザーが切断しました");
-	});
+    socket.join(roomId);
+    console.log(`ユーザーがルームに参加しました: RoomID = ${roomId}, Username = ${username}`);
+
+    io.to(roomId).emit("user-joined", { userId, username });
+  });
+
+  socket.on("leave-room", ({ roomId, userId, username }) => {
+    console.log(`leave-roomイベント受信:`, { roomId, userId, username });
+
+    if (!rooms[roomId]) {
+      console.warn(`ルームが存在しません: RoomID = ${roomId}`);
+      return;
+    }
+
+    socket.leave(roomId);
+    console.log(`ユーザーがルームを退出しました: RoomID = ${roomId}, Username = ${username}`);
+
+    io.to(roomId).emit("user-left", { userId, username });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("ユーザーが切断しました: SocketID =", socket.id);
+  });
 });
+
+// 定期的にルームの状態をログ出力
+setInterval(() => {
+  console.log("現在のルーム状態:", rooms);
+}, 10000); // 10秒ごとに出力
+
 
 server.listen(3001, () => {
 	console.log("Server listening on port 3001");
