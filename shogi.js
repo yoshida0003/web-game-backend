@@ -85,17 +85,20 @@ router.post("/move-piece", function (req, res) {
 		const turnLog = `ターン交代: 次のプレイヤー -> ${room.currentPlayer === room.firstPlayer.id ? "先手" : "後手"} (${room.currentPlayer})`;
 		room.logs.push(turnLog);
 
-		// ✅ すべてのクライアントに盤面を送信する
-		req.app.get("io").to(roomId).emit("update-board", {
-			board: room.board,
-			currentPlayer: room.currentPlayer,
-			logs: room.logs, // 🔥 ターン交代のログも含める
-		});
-		console.log("📢 サーバー `update-board` 送信:", {
+		console.log("📢 update-board を送信: ", {
+			roomId,
 			board: room.board,
 			currentPlayer: room.currentPlayer,
 			logs: room.logs,
 		});
+
+		// ✅ 全クライアントにイベント送信
+		req.app.get("io").emit("update-board", {
+			board: room.board,
+			currentPlayer: room.currentPlayer,
+			logs: room.logs,
+		});
+
 
 		// ✅ ログにターン情報を明示的に出力
 		console.log(`✅ ${moveLog}`);

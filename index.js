@@ -150,6 +150,14 @@ app.use("/api/shogi", shogiRouter);
 
 // Socket.ioのイベント処理
 io.on("connection", (socket) => {
+	const { roomId } = socket.handshake.query;
+	console.log("✅ ユーザー接続:", { socketId: socket.id, roomId });
+
+	if (roomId) {
+		socket.join(roomId);
+		console.log(`✅ ${socket.id} がルーム ${roomId} に参加しました`);
+	}
+
   console.log("ユーザーが接続しました");
   socket.emit("server-log", "ユーザーが接続しました");
 
