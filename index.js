@@ -118,23 +118,33 @@ app.post("/api/start-game", function (req, res) {
 
 	if (room && room.users.length === 2) {
 		room.gameStarted = true;
-    room.board = initializeBoard();
+		room.board = initializeBoard();
 
-    // 先手後手をランダムで決定
-    const [firstPlayer, secondPlayer] = room.users.sort(() => Math.random -0.5);
-    room.firstPlayer = firstPlayer;
-    room.secondPlayer = secondPlayer;
-    room.currentPlayer = firstPlayer.id;
+		// 先手後手をランダムで決定
+		const [firstPlayer, secondPlayer] = room.users.sort(() => Math.random() - 0.5);
+		room.firstPlayer = firstPlayer;
+		room.secondPlayer = secondPlayer;
+		room.currentPlayer = firstPlayer.id;
 
-		io.to(roomId).emit("game-started", { board: room.board, firstPlayer, secondPlayer });
+		// ✅ logs を初期化
+		room.logs = [];
+
+		io.to(roomId).emit("game-started", {
+			board: room.board,
+			firstPlayer,
+			secondPlayer,
+			logs: room.logs, // ✅ クライアントにも logs を送信
+		});
+
 		console.log(
-      `部屋${roomId}のゲームを開始しました! 先手: ${firstPlayer.username}, 後手: ${secondPlayer.username}`
-    );
+			`部屋${roomId}のゲームを開始しました! 先手: ${firstPlayer.username}, 後手: ${secondPlayer.username}`
+		);
 		res.json({ message: "Game started" });
 	} else {
 		res.status(400).json({ message: "ゲームが始められません" });
 	}
-})
+});
+
 
 app.use("/api/shogi", shogiRouter);
 
