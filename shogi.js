@@ -48,6 +48,22 @@ const initializeBoard = () => {
   board[0][2] = "s";
   board[0][6] = "s";
 
+	// 先手の桂馬を2九と8九に配置
+	board[8][1] = "N";
+	board[8][7] = "N";
+
+	// 後手の桂馬を2一と8一に配置
+	board[0][1] = "n";
+	board[0][7] = "n";
+
+	// 先手の香車を1九と9九に配置	
+	board[8][0] = "L";
+  board[8][8] = "L";
+
+  // 後手の香��を1一と9一に配置
+  board[0][0] = "l";
+  board[0][8] = "l";
+
   return board;
 };
 
@@ -123,6 +139,28 @@ const pieceMovementRules = {
     const isDiagonal = Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1;
     return isVaildVertical || isDiagonal;
   },
+	// 先手の桂馬の移動範囲
+	N: (fromX, fromY, toX, toY, isFirstPlayer) => {
+		const expectedX = isFirstPlayer ? fromX - 2 : fromX + 2;
+		const expectedY = isFirstPlayer ? fromY - 1 : fromY + 1;
+		return toX === expectedX && toY === expectedY;
+	},
+	// 後手の桂馬の移動範囲
+	n: (fromX, fromY, toX, toY, isFirstPlayer) => {
+		const expectedX = isFirstPlayer ? fromX - 2 : fromX + 2;
+		const expectedY = isFirstPlayer ? fromY - 1 : fromY + 1;
+		return toX === expectedX && toY === expectedY;
+	},
+	// 先手の香車の移動範囲
+	L: (fromX, fromY, toX, toY, isFirstPlayer) => {
+		const expectedX = isFirstPlayer ? fromX - 1 : fromX + 1;
+		return toX === expectedX && toY === fromY;
+	},
+	// 後手の香車の移動範囲
+	l: (fromX, fromY, toX, toY, isFirstPlayer) => {
+		const expectedX = isFirstPlayer ? fromX - 1 : fromX + 1;
+		return toX === expectedX && toY === fromY;
+	},
 };
 
 const pieceNames = {
