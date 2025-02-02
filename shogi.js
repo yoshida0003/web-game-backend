@@ -99,26 +99,80 @@ const pieceMovementRules = {
     return Math.abs(fromX - toX) <= 1 && Math.abs(fromY - toY) <= 1;
   },
   // 先手の飛車の移動範囲
-  R: (fromX, fromY, toX, toY) => {
-    return fromX === toX || fromY === toY;
+  R: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+    if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
+
+    const directionX = fromX === toX ? 0 : toX > fromX ? 1 : -1; // 左右移動
+    const directionY = fromY === toY ? 0 : toY > fromY ? 1 : -1; // 上下移動
+
+    for (
+      let x = fromX + directionX, y = fromY + directionY;
+      x !== toX || y !== toY;
+      x += directionX, y += directionY
+    ) {
+      if (board[x]?.[y]) return false; // ❌ 途中に駒があれば移動不可
+    }
+
+    return true; // ✅ 途中に駒がなければ移動可能
   },
   // 後手の飛車の移動範囲
-  r: (fromX, fromY, toX, toY) => {
-    return fromX === toX || fromY === toY;
+  r: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+    if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
+
+    const directionX = fromX === toX ? 0 : toX > fromX ? 1 : -1;
+    const directionY = fromY === toY ? 0 : toY > fromY ? 1 : -1;
+
+    for (
+      let x = fromX + directionX, y = fromY + directionY;
+      x !== toX || y !== toY;
+      x += directionX, y += directionY
+    ) {
+      if (board[x]?.[y]) return false;
+    }
+
+    return true;
   },
+
   // 先手の角の移動範囲
-  B: (fromX, fromY, toX, toY) => {
-    return Math.abs(fromX - toX) === Math.abs(fromY - toY);
+  B: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+    if (Math.abs(fromX - toX) !== Math.abs(fromY - toY)) return false; // ❌ 斜め移動のみ可能
+
+    const directionX = toX > fromX ? 1 : -1;
+    const directionY = toY > fromY ? 1 : -1;
+
+    for (
+      let x = fromX + directionX, y = fromY + directionY;
+      x !== toX;
+      x += directionX, y += directionY
+    ) {
+      if (board[x]?.[y]) return false; // ❌ 途中に駒があれば移動不可
+    }
+
+    return true;
   },
   // 後手の角の移動範囲
-  b: (fromX, fromY, toX, toY) => {
-    return Math.abs(fromX - toX) === Math.abs(fromY - toY);
+  b: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+    if (Math.abs(fromX - toX) !== Math.abs(fromY - toY)) return false;
+
+    const directionX = toX > fromX ? 1 : -1;
+    const directionY = toY > fromY ? 1 : -1;
+
+    for (
+      let x = fromX + directionX, y = fromY + directionY;
+      x !== toX;
+      x += directionX, y += directionY
+    ) {
+      if (board[x]?.[y]) return false;
+    }
+
+    return true;
   },
   // 先手の金の移動範囲
   G: (fromX, fromY, toX, toY) => {
     const isVertical = Math.abs(fromX - toX) === 1 && fromY === toY; // 縦移動
     const isHorizontal = Math.abs(fromY - toY) === 1 && fromX === toX; // 横移動
-    const isDiagonal = Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1; // 斜め移動
+    const isDiagonal =
+      Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1; // 斜め移動
     const isValidDiagonal = isDiagonal && toX < fromX; // 右下と左下には行けない
     return isVertical || isHorizontal || isValidDiagonal;
   },
@@ -126,7 +180,8 @@ const pieceMovementRules = {
   g: (fromX, fromY, toX, toY) => {
     const isVertical = Math.abs(fromX - toX) === 1 && fromY === toY; // 縦移動
     const isHorizontal = Math.abs(fromY - toY) === 1 && fromX === toX; // 横移動
-    const isDiagonal = Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1; // 斜め移動
+    const isDiagonal =
+      Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1; // 斜め移動
     const isValidDiagonal = isDiagonal && fromX < toX; // 右下と左下には行けない （ただし先手基準とは逆になる）
     return isVertical || isHorizontal || isValidDiagonal;
   },
@@ -134,65 +189,75 @@ const pieceMovementRules = {
   S: (fromX, fromY, toX, toY) => {
     const isVertical = Math.abs(fromX - toX) === 1 && fromY === toY; // 縦移動
     const isVaildVertical = isVertical && toX < fromX; // 下には行けない
-    const isDiagonal = Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1;
+    const isDiagonal =
+      Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1;
     return isVaildVertical || isDiagonal;
   },
   // 後手の銀の移動範囲
   s: (fromX, fromY, toX, toY) => {
     const isVertical = Math.abs(fromX - toX) === 1 && fromY === toY; // 縦移動
     const isVaildVertical = isVertical && fromX < toX; // 下には行けない（ただし先手基準とは逆になる）
-    const isDiagonal = Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1;
+    const isDiagonal =
+      Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1;
     return isVaildVertical || isDiagonal;
   },
-	// 先手の桂馬の移動範囲
-	N: (fromX, fromY, toX, toY) => {
-		return (
-			(toX === fromX - 2 && (toY === fromY - 1 || toY === fromY + 1)) // 先手基準のL字移動
-		);
-	},
-	// 後手の桂馬の移動範囲
-	n: (fromX, fromY, toX, toY) => {
-		return (
-			(toX === fromX + 2 && (toY === fromY - 1 || toY === fromY + 1)) // 後手基準のL字移動
-		);
-	},
-	L: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
-		if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
-		if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
+  // 先手の桂馬の移動範囲
+  N: (fromX, fromY, toX, toY) => {
+    return (
+      toX === fromX - 2 && (toY === fromY - 1 || toY === fromY + 1) // 先手基準のL字移動
+    );
+  },
+  // 後手の桂馬の移動範囲
+  n: (fromX, fromY, toX, toY) => {
+    return (
+      toX === fromX + 2 && (toY === fromY - 1 || toY === fromY + 1) // 後手基準のL字移動
+    );
+  },
+  // 先手の香車の移動範囲
+  L: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+    if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
+    if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
 
-		const direction = toX < fromX ? -1 : 1; // 🔼 上へ(-1) / 🔽 下へ(+1)
-		let maxReachableX = direction === -1 ? 0 : 8; // 初期値: 端まで移動可能
+    const direction = -1; // 先手の香車は上方向へ進む
+    let maxReachableX = 0; // 盤の上端（0）まで移動可能
 
-		console.log(`🚀 ${fromX + 1}${"一二三四五六七八九"[fromY]} 香車の移動チェック開始`);
+    for (let x = fromX + direction; x >= 0; x += direction) {
+      if (!board[x]) break; // ❌ `board[x]` が範囲外ならループ終了
+      const pieceAtX = board[x][fromY];
 
-		for (let x = fromX + direction; x >= 0 && x < 9; x += direction) {
-			if (!Array.isArray(board) || !Array.isArray(board[x])) {
-				console.error(`❌ board[${x}] が undefined！ループを終了`);
-				break;
-			}
+      if (pieceAtX) {
+        // ❗ 最初にぶつかる駒を見つけた
+        const isOwnPiece = pieceAtX.toUpperCase() === pieceAtX; // 大文字なら先手の駒
+        maxReachableX = isOwnPiece ? x - direction : x; // 🏁 自分の駒なら1つ手前、相手の駒ならそこまで
+        break;
+      }
+    }
 
-			console.log(`🔍 board[${x}] の内容:`, board[x]);
-			if (!board[x]) break; // ❌ `board[x]` が範囲外ならループ終了
-			const pieceAtX = board[x][fromY];
+    return toX === maxReachableX; // 🚀 目的地が許可された範囲内ならOK
+  },
 
-			console.log(`🔍 チェック中: ${x + 1}${"一二三四五六七八九"[fromY]} の駒 = ${pieceAtX || "なし"}`);
+  // 後手の香車の移動範囲
+  l: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+    if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
+    if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
 
-			if (pieceAtX) { // ❗ 最初にぶつかる駒を見つけた
-				const isOwnPiece = isFirstPlayer
-					? pieceAtX.toUpperCase() === pieceAtX // 大文字なら先手の駒
-					: pieceAtX.toLowerCase() === pieceAtX; // 小文字なら後手の駒
+    const direction = 1; // 後手の香車は下方向へ進む
+    let maxReachableX = 8; // 盤の下端（8）まで移動可能
 
-				maxReachableX = isOwnPiece ? x - direction : x; // 🏁 自分の駒なら1つ手前、相手の駒ならそこまで
-				break;
-			}
-		}
+    for (let x = fromX + direction; x <= 8; x += direction) {
+      if (!board[x]) break; // ❌ `board[x]` が範囲外ならループ終了
+      const pieceAtX = board[x][fromY];
 
-		console.log(`✅ ${fromX + 1}${"一二三四五六七八九"[fromY]} 香車の移動できる最大は ${maxReachableX + 1}${"一二三四五六七八九"[fromY]} です。`);
+      if (pieceAtX) {
+        // ❗ 最初にぶつかる駒を見つけた
+        const isOwnPiece = pieceAtX.toLowerCase() === pieceAtX; // 小文字なら後手の駒
+        maxReachableX = isOwnPiece ? x - direction : x; // 🏁 自分の駒なら1つ手前、相手の駒ならそこまで
+        break;
+      }
+    }
 
-		return toX === maxReachableX; // 🚀 目的地が許可された範囲内ならOK
-	},
-
-
+    return toX === maxReachableX; // 🚀 目的地が許可された範囲内ならOK
+  },
 };
 
 const pieceNames = {
@@ -208,6 +273,10 @@ const pieceNames = {
   g: "金",
   S: "銀",
   s: "銀",
+  N: "桂馬",
+  n: "桂馬",
+  L: "香車",
+  l: "香車",
 };
 
 // 駒の移動 API (ドラッグ＆ドロップ用)
@@ -263,7 +332,8 @@ router.post("/move-piece", function (req, res) {
         actualFromY,
         actualToX,
         actualToY,
-        isFirstPlayer
+        isFirstPlayer,
+        room.board 
       )
     ) {
       console.error("❌ 不正な移動です:", {
