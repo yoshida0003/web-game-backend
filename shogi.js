@@ -67,6 +67,11 @@ const initializeBoard = () => {
   return board;
 };
 
+// ボードの内容を確認
+const board = initializeBoard();
+console.log("🔍 初期化されたボード全体:");
+console.table(board);
+
 // ✅ 駒台（取られた駒を保存）
 const initializeCapturedPieces = () => ({
   firstPlayer: [],
@@ -140,27 +145,54 @@ const pieceMovementRules = {
     return isVaildVertical || isDiagonal;
   },
 	// 先手の桂馬の移動範囲
-	N: (fromX, fromY, toX, toY, isFirstPlayer) => {
-		const expectedX = isFirstPlayer ? fromX - 2 : fromX + 2;
-		const expectedY = isFirstPlayer ? fromY - 1 : fromY + 1;
-		return toX === expectedX && toY === expectedY;
+	N: (fromX, fromY, toX, toY) => {
+		return (
+			(toX === fromX - 2 && (toY === fromY - 1 || toY === fromY + 1)) // 先手基準のL字移動
+		);
 	},
 	// 後手の桂馬の移動範囲
-	n: (fromX, fromY, toX, toY, isFirstPlayer) => {
-		const expectedX = isFirstPlayer ? fromX - 2 : fromX + 2;
-		const expectedY = isFirstPlayer ? fromY - 1 : fromY + 1;
-		return toX === expectedX && toY === expectedY;
+	n: (fromX, fromY, toX, toY) => {
+		return (
+			(toX === fromX + 2 && (toY === fromY - 1 || toY === fromY + 1)) // 後手基準のL字移動
+		);
 	},
-	// 先手の香車の移動範囲
-	L: (fromX, fromY, toX, toY, isFirstPlayer) => {
-		const expectedX = isFirstPlayer ? fromX - 1 : fromX + 1;
-		return toX === expectedX && toY === fromY;
+	L: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+		if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
+		if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
+
+		const direction = toX < fromX ? -1 : 1; // 🔼 上へ(-1) / 🔽 下へ(+1)
+		let maxReachableX = direction === -1 ? 0 : 8; // 初期値: 端まで移動可能
+
+		console.log(`🚀 ${fromX + 1}${"一二三四五六七八九"[fromY]} 香車の移動チェック開始`);
+
+		for (let x = fromX + direction; x >= 0 && x < 9; x += direction) {
+			if (!Array.isArray(board) || !Array.isArray(board[x])) {
+				console.error(`❌ board[${x}] が undefined！ループを終了`);
+				break;
+			}
+
+			console.log(`🔍 board[${x}] の内容:`, board[x]);
+			if (!board[x]) break; // ❌ `board[x]` が範囲外ならループ終了
+			const pieceAtX = board[x][fromY];
+
+			console.log(`🔍 チェック中: ${x + 1}${"一二三四五六七八九"[fromY]} の駒 = ${pieceAtX || "なし"}`);
+
+			if (pieceAtX) { // ❗ 最初にぶつかる駒を見つけた
+				const isOwnPiece = isFirstPlayer
+					? pieceAtX.toUpperCase() === pieceAtX // 大文字なら先手の駒
+					: pieceAtX.toLowerCase() === pieceAtX; // 小文字なら後手の駒
+
+				maxReachableX = isOwnPiece ? x - direction : x; // 🏁 自分の駒なら1つ手前、相手の駒ならそこまで
+				break;
+			}
+		}
+
+		console.log(`✅ ${fromX + 1}${"一二三四五六七八九"[fromY]} 香車の移動できる最大は ${maxReachableX + 1}${"一二三四五六七八九"[fromY]} です。`);
+
+		return toX === maxReachableX; // 🚀 目的地が許可された範囲内ならOK
 	},
-	// 後手の香車の移動範囲
-	l: (fromX, fromY, toX, toY, isFirstPlayer) => {
-		const expectedX = isFirstPlayer ? fromX - 1 : fromX + 1;
-		return toX === expectedX && toY === fromY;
-	},
+
+
 };
 
 const pieceNames = {
@@ -184,6 +216,10 @@ router.post("/move-piece", function (req, res) {
     const { roomId, userId, fromX, fromY, toX, toY } = req.body;
     const rooms = req.app.get("rooms");
     const room = rooms[roomId];
+
+		console.log("📋 ルームのボード情報:", room ? room.board : "ルームなし");
+
+		console.log(`📋 board 配列の内容:`, room.board);
 
     if (!room || !room.gameStarted) {
       console.error("❌ ゲームが開始されていません");
