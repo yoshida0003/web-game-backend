@@ -74,8 +74,8 @@ console.table(board);
 
 // ✅ 駒台（取られた駒を保存）
 const initializeCapturedPieces = () => ({
-  firstPlayer: [],
-  secondPlayer: [],
+	firstPlayer: [],
+	secondPlayer: [],
 });
 
 // 駒の移動可能範囲
@@ -360,27 +360,29 @@ router.post("/move-piece", function (req, res) {
       }
     }
 
-    // ✅ 「成る」処理
-    if (promote) {
-      if (
-        (piece === "P" && actualToX <= 2) ||
-        (piece === "p" && actualToX >= 6)
-      ) {
-        piece = piece === "P" ? "RP" : "rp"; // 成り歩に変換
-        console.log(`✨ ${piece} に成りました！`);
-      }
-    }
+		// ✅ 「成る」処理（既に成った駒は成れない）
+		if (promote) {
+			if (
+				(piece === "P" && actualToX <= 2) ||
+				(piece === "p" && actualToX >= 6)
+			) {
+				piece = piece === "P" ? "RP" : "rp"; // 成り歩に変換
+				console.log(`✨ ${piece} に成りました！`);
+			}
+		}
 
-    // ✅ 駒を移動
-    room.board[actualToX][actualToY] = piece;
-    room.board[actualFromX][actualFromY] = null;
+		// ✅ 「成らない」を選択した場合も駒を移動
+		room.board[actualToX][actualToY] = piece; // 駒を移動
+		room.board[actualFromX][actualFromY] = null; // 元の位置を空にする
+
+		console.log(`🚀 駒を移動: ${actualFromX},${actualFromY} → ${actualToX},${actualToY}, 成り=${promote}`);
+
+		room.board[actualFromX][actualFromY] = null;
 
     // ✅ ターン交代
     room.currentPlayer = isFirstPlayer
       ? room.secondPlayer.id
       : room.firstPlayer.id;
-
-    console.log(`🛠 ターン交代: 次のプレイヤー -> ${room.currentPlayer}`);
 
     // ✅ `logs` を初期化
     if (!room.logs) {
@@ -408,14 +410,6 @@ router.post("/move-piece", function (req, res) {
       room.currentPlayer === room.firstPlayer.id ? "先手" : "後手"
     } (${room.currentPlayer})`;
     room.logs.push(turnLog);
-
-    console.log("📢 update-board を送信: ", {
-      roomId,
-      board: room.board,
-      currentPlayer: room.currentPlayer,
-      logs: room.logs,
-      capturedPieces: room.capturedPieces,
-    });
 
     // ✅ 全クライアントにイベント送信
     req.app.get("io").emit("update-board", {
