@@ -74,8 +74,8 @@ console.table(board);
 
 // ✅ 駒台（取られた駒を保存）
 const initializeCapturedPieces = () => ({
-  firstPlayer: [],
-  secondPlayer: [],
+	firstPlayer: [],
+	secondPlayer: [],
 });
 
 // 駒の移動可能範囲
@@ -99,7 +99,7 @@ const pieceMovementRules = {
     return Math.abs(fromX - toX) <= 1 && Math.abs(fromY - toY) <= 1;
   },
   // 先手の飛車の移動範囲
-  R: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+  R: (fromX, fromY, toX, toY, board) => {
     if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
 
     const directionX = fromX === toX ? 0 : toX > fromX ? 1 : -1; // 左右移動
@@ -116,7 +116,7 @@ const pieceMovementRules = {
     return true; // ✅ 途中に駒がなければ移動可能
   },
   // 後手の飛車の移動範囲
-  r: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+  r: (fromX, fromY, toX, toY, board) => {
     if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
 
     const directionX = fromX === toX ? 0 : toX > fromX ? 1 : -1;
@@ -134,7 +134,7 @@ const pieceMovementRules = {
   },
 
   // 先手の角の移動範囲
-  B: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+  B: (fromX, fromY, toX, toY, board) => {
     if (Math.abs(fromX - toX) !== Math.abs(fromY - toY)) return false; // ❌ 斜め移動のみ可能
 
     const directionX = toX > fromX ? 1 : -1;
@@ -151,7 +151,7 @@ const pieceMovementRules = {
     return true;
   },
   // 後手の角の移動範囲
-  b: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+  b: (fromX, fromY, toX, toY, board) => {
     if (Math.abs(fromX - toX) !== Math.abs(fromY - toY)) return false;
 
     const directionX = toX > fromX ? 1 : -1;
@@ -214,7 +214,7 @@ const pieceMovementRules = {
     );
   },
   // 先手の香車の移動範囲
-  L: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+  L: (fromX, fromY, toX, toY, board) => {
     if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
     if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
 
@@ -237,7 +237,7 @@ const pieceMovementRules = {
   },
 
   // 後手の香車の移動範囲
-  l: (fromX, fromY, toX, toY, isFirstPlayer, board) => {
+  l: (fromX, fromY, toX, toY, board) => {
     if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
     if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
 
@@ -277,18 +277,20 @@ const pieceNames = {
   n: "桂馬",
   L: "香車",
   l: "香車",
+  RP: "成り歩",
+  rp: "成り歩",
 };
+
+// 駒の成り歩の移動範囲（金と同じ）
+pieceMovementRules["RP"] = pieceMovementRules["G"];
+pieceMovementRules["rp"] = pieceMovementRules["g"];
 
 // 駒の移動 API (ドラッグ＆ドロップ用)
 router.post("/move-piece", function (req, res) {
   try {
-    const { roomId, userId, fromX, fromY, toX, toY } = req.body;
+    const { roomId, userId, fromX, fromY, toX, toY, promote } = req.body;
     const rooms = req.app.get("rooms");
     const room = rooms[roomId];
-
-		console.log("📋 ルームのボード情報:", room ? room.board : "ルームなし");
-
-		console.log(`📋 board 配列の内容:`, room.board);
 
     if (!room || !room.gameStarted) {
       console.error("❌ ゲームが開始されていません");
@@ -312,12 +314,7 @@ router.post("/move-piece", function (req, res) {
     const actualFromY = isFirstPlayer ? fromY : 8 - fromY;
     const actualToX = isFirstPlayer ? toX : 8 - toX;
     const actualToY = isFirstPlayer ? toY : 8 - toY;
-
-    console.log(
-      `📥 サーバー move-piece 受信: ${actualFromX},${actualFromY} -> ${actualToX},${actualToY}`
-    );
-
-    const piece = room.board[actualFromX]?.[actualFromY];
+    let piece = room.board[actualFromX]?.[actualFromY];
 
     if (!piece) {
       console.error("❌ 移動元に駒がありません", { actualFromX, actualFromY });
@@ -333,7 +330,7 @@ router.post("/move-piece", function (req, res) {
         actualToX,
         actualToY,
         isFirstPlayer,
-        room.board 
+        room.board
       )
     ) {
       console.error("❌ 不正な移動です:", {
@@ -363,16 +360,29 @@ router.post("/move-piece", function (req, res) {
       }
     }
 
-    // ✅ 駒を移動
-    room.board[actualToX][actualToY] = piece;
-    room.board[actualFromX][actualFromY] = null;
+		// ✅ 「成る」処理（既に成った駒は成れない）
+		if (promote) {
+			if (
+				(piece === "P" && actualToX <= 2) ||
+				(piece === "p" && actualToX >= 6)
+			) {
+				piece = piece === "P" ? "RP" : "rp"; // 成り歩に変換
+				console.log(`✨ ${piece} に成りました！`);
+			}
+		}
+
+		// ✅ 「成らない」を選択した場合も駒を移動
+		room.board[actualToX][actualToY] = piece; // 駒を移動
+		room.board[actualFromX][actualFromY] = null; // 元の位置を空にする
+
+		console.log(`🚀 駒を移動: ${actualFromX},${actualFromY} → ${actualToX},${actualToY}, 成り=${promote}`);
+
+		room.board[actualFromX][actualFromY] = null;
 
     // ✅ ターン交代
     room.currentPlayer = isFirstPlayer
       ? room.secondPlayer.id
       : room.firstPlayer.id;
-
-    console.log(`🛠 ターン交代: 次のプレイヤー -> ${room.currentPlayer}`);
 
     // ✅ `logs` を初期化
     if (!room.logs) {
@@ -400,14 +410,6 @@ router.post("/move-piece", function (req, res) {
       room.currentPlayer === room.firstPlayer.id ? "先手" : "後手"
     } (${room.currentPlayer})`;
     room.logs.push(turnLog);
-
-    console.log("📢 update-board を送信: ", {
-      roomId,
-      board: room.board,
-      currentPlayer: room.currentPlayer,
-      logs: room.logs,
-      capturedPieces: room.capturedPieces,
-    });
 
     // ✅ 全クライアントにイベント送信
     req.app.get("io").emit("update-board", {
