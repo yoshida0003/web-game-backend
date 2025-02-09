@@ -85,19 +85,23 @@ const pieceMovementRules = {
     const expectedX = isFirstPlayer ? fromX - 1 : fromX + 1;
     return toX === expectedX && toY === fromY;
   },
+
   // 後手の歩の移動範囲
   p: (fromX, fromY, toX, toY, isFirstPlayer) => {
     const expectedX = isFirstPlayer ? fromX - 1 : fromX + 1;
     return toX === expectedX && toY === fromY;
   },
+
   // 先手の玉の移動範囲
   K: (fromX, fromY, toX, toY) => {
     return Math.abs(fromX - toX) <= 1 && Math.abs(fromY - toY) <= 1;
   },
+
   // 後手の玉の移動範囲
   k: (fromX, fromY, toX, toY) => {
     return Math.abs(fromX - toX) <= 1 && Math.abs(fromY - toY) <= 1;
   },
+
   // 先手の飛車の移動範囲
   R: (fromX, fromY, toX, toY, board) => {
     if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
@@ -115,6 +119,7 @@ const pieceMovementRules = {
 
     return true; // ✅ 途中に駒がなければ移動可能
   },
+
   // 後手の飛車の移動範囲
   r: (fromX, fromY, toX, toY, board) => {
     if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
@@ -176,6 +181,7 @@ const pieceMovementRules = {
     const isValidDiagonal = isDiagonal && toX < fromX; // 右下と左下には行けない
     return isVertical || isHorizontal || isValidDiagonal;
   },
+
   // 後手の金の移動範囲
   g: (fromX, fromY, toX, toY) => {
     const isVertical = Math.abs(fromX - toX) === 1 && fromY === toY; // 縦移動
@@ -185,6 +191,7 @@ const pieceMovementRules = {
     const isValidDiagonal = isDiagonal && fromX < toX; // 右下と左下には行けない （ただし先手基準とは逆になる）
     return isVertical || isHorizontal || isValidDiagonal;
   },
+
   // 先手の銀の移動範囲
   S: (fromX, fromY, toX, toY) => {
     const isVertical = Math.abs(fromX - toX) === 1 && fromY === toY; // 縦移動
@@ -193,6 +200,7 @@ const pieceMovementRules = {
       Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1;
     return isVaildVertical || isDiagonal;
   },
+
   // 後手の銀の移動範囲
   s: (fromX, fromY, toX, toY) => {
     const isVertical = Math.abs(fromX - toX) === 1 && fromY === toY; // 縦移動
@@ -201,18 +209,21 @@ const pieceMovementRules = {
       Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1;
     return isVaildVertical || isDiagonal;
   },
+
   // 先手の桂馬の移動範囲
   N: (fromX, fromY, toX, toY) => {
     return (
       toX === fromX - 2 && (toY === fromY - 1 || toY === fromY + 1) // 先手基準のL字移動
     );
   },
+
   // 後手の桂馬の移動範囲
   n: (fromX, fromY, toX, toY) => {
     return (
       toX === fromX + 2 && (toY === fromY - 1 || toY === fromY + 1) // 後手基準のL字移動
     );
   },
+
   // 先手の香車の移動範囲
   L: (fromX, fromY, toX, toY, board) => {
     if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
@@ -258,6 +269,62 @@ const pieceMovementRules = {
 
     return toX === maxReachableX; // 🚀 目的地が許可された範囲内ならOK
   },
+
+  // 成り飛車（竜王）の移動範囲
+  PR: (fromX, fromY, toX, toY, board) => {
+    // 🚀 飛車の縦横移動をそのまま許可
+    if (pieceMovementRules["R"](fromX, fromY, toX, toY, board)) {
+      return true;
+    }
+
+    // 🚀 斜め1マスの移動を許可
+    if (Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1) {
+      return true;
+    }
+
+  },
+
+  // 成り飛車（後手）の移動範囲
+  pr: (fromX, fromY, toX, toY, board) => {
+    if (pieceMovementRules["r"](fromX, fromY, toX, toY, board)) {
+      return true;
+    }
+
+    if (Math.abs(fromX - toX) === 1 && Math.abs(fromY - toY) === 1) {
+      return true;
+    }
+  },
+
+  // 成馬の移動範囲
+  PB: (fromX, fromY, toX, toY, board) => {
+    // 🚀 角の斜め移動をそのまま許可
+    if (pieceMovementRules["B"](fromX, fromY, toX, toY, board)) {
+      return true;
+    }
+
+    // 🚀 縦横1マスの移動を許可
+    if (
+      (Math.abs(fromX - toX) === 1 && fromY === toY) || // 縦移動
+      (Math.abs(fromY - toY) === 1 && fromX === toX)
+    ) {
+      // 横移動
+      return true;
+    }
+  },
+
+  // 成馬の移動範囲
+  pb: (fromX, fromY, toX, toY, board) => {
+    if (pieceMovementRules["b"](fromX, fromY, toX, toY, board)) {
+      return true;
+    }
+
+    if (
+      (Math.abs(fromX - toX) === 1 && fromY === toY) ||
+      (Math.abs(fromY - toY) === 1 && fromX === toX)
+    ) {
+      return true;
+    }
+  },
 };
 
 const pieceNames = {
@@ -277,13 +344,29 @@ const pieceNames = {
   n: "桂馬",
   L: "香車",
   l: "香車",
-  RP: "成り歩",
-  rp: "成り歩",
+  PP: "成り歩",
+  pp: "成り歩",
+  PS: "成り銀",
+  ps: "成り銀",
+  PN: "成り桂",
+  pn: "成り桂",
+  PL: "成り香",
+  pl: "成り香",
+  PR: "成り飛車",
+  pr: "成り飛車",
+  PB: "成り角",
+  pb: "成り角",
 };
 
-// 駒の成り歩の移動範囲（金と同じ）
-pieceMovementRules["RP"] = pieceMovementRules["G"];
-pieceMovementRules["rp"] = pieceMovementRules["g"];
+// と金、成銀、成桂、成香の移動範囲（金と同じ）
+pieceMovementRules["PP"] = pieceMovementRules["G"];
+pieceMovementRules["pp"] = pieceMovementRules["g"];
+pieceMovementRules["PS"] = pieceMovementRules["S"];
+pieceMovementRules["ps"] = pieceMovementRules["s"];
+pieceMovementRules["PN"] = pieceMovementRules["N"];
+pieceMovementRules["pn"] = pieceMovementRules["n"];
+pieceMovementRules["PL"] = pieceMovementRules["L"];
+pieceMovementRules["pl"] = pieceMovementRules["l"];
 
 // 駒の移動 API (ドラッグ＆ドロップ用)
 router.post("/move-piece", function (req, res) {
@@ -293,12 +376,10 @@ router.post("/move-piece", function (req, res) {
     const room = rooms[roomId];
 
     if (!room || !room.gameStarted) {
-      console.error("❌ ゲームが開始されていません");
       return res.status(400).json({ message: "ゲームが開始されていません" });
     }
 
     if (room.currentPlayer !== userId) {
-      console.error("❌ ターンではないプレイヤーが駒を動かそうとしました");
       return res.status(400).json({ message: "あなたのターンではありません" });
     }
 
@@ -316,12 +397,42 @@ router.post("/move-piece", function (req, res) {
     const actualToY = isFirstPlayer ? toY : 8 - toY;
     let piece = room.board[actualFromX]?.[actualFromY];
 
+    // ✅ 1. 駒がない場合はエラー
     if (!piece) {
-      console.error("❌ 移動元に駒がありません", { actualFromX, actualFromY });
       return res.status(400).json({ message: "移動できる駒がありません" });
     }
 
-    // ✅駒の移動ルールを適用
+    // ✅ 2. 同じ場所に移動しようとしたら何もしない
+    if (actualFromX === actualToX && actualFromY === actualToY) {
+      return res
+        .status(400)
+        .json({ message: "同じ場所に移動することはできません" });
+    }
+
+    // ✅ 3. 自分の駒かチェック
+    const isOwnPiece =
+      (isFirstPlayer && piece === piece.toUpperCase()) ||
+      (!isFirstPlayer && piece === piece.toLowerCase());
+
+    if (!isOwnPiece) {
+      return res.status(400).json({ message: "相手の駒は動かせません" });
+    }
+
+    // ✅ 4. **移動先に自分の駒があるかチェック**
+    const targetPiece = room.board[actualToX][actualToY];
+    if (targetPiece) {
+      const isOwnTargetPiece =
+        (isFirstPlayer && targetPiece === targetPiece.toUpperCase()) ||
+        (!isFirstPlayer && targetPiece === targetPiece.toLowerCase());
+
+      if (isOwnTargetPiece) {
+        return res
+          .status(400)
+          .json({ message: "自分の駒がある場所には指せません" });
+      }
+    }
+
+    // ✅ 5. 移動ルールのチェック
     if (
       !pieceMovementRules[piece] ||
       !pieceMovementRules[piece](
@@ -333,85 +444,70 @@ router.post("/move-piece", function (req, res) {
         room.board
       )
     ) {
-      console.error("❌ 不正な移動です:", {
-        actualFromX,
-        actualFromY,
-        actualToX,
-        actualToY,
-      });
       return res.status(400).json({ message: "不正な移動です" });
     }
 
-    // ✅ 相手の駒を取ったら駒台に追加
-    const targetPiece = room.board[actualToX][actualToY];
-
+    // ✅ 6. 相手の駒を取ったら駒台に追加
     if (targetPiece) {
-      if (
-        (isFirstPlayer && targetPiece === targetPiece.toLowerCase()) ||
-        (!isFirstPlayer && targetPiece === targetPiece.toUpperCase())
-      ) {
-        const capturedPiece = targetPiece.toUpperCase(); // 取られた駒は大文字に統一（将来的な打ち直しのため）
+      const capturedPiece = targetPiece.toUpperCase();
+      const owner = isFirstPlayer ? "second" : "first";
 
-        if (isFirstPlayer) {
-          room.capturedPieces.firstPlayer.push(capturedPiece);
-        } else {
-          room.capturedPieces.secondPlayer.push(capturedPiece);
-        }
+      if (isFirstPlayer) {
+        room.capturedPieces.firstPlayer.push({ piece: capturedPiece, owner });
+      } else {
+        room.capturedPieces.secondPlayer.push({ piece: capturedPiece, owner });
       }
     }
 
-		// ✅ 「成る」処理（既に成った駒は成れない）
-		if (promote) {
-			if (
-				(piece === "P" && actualToX <= 2) ||
-				(piece === "p" && actualToX >= 6)
-			) {
-				piece = piece === "P" ? "RP" : "rp"; // 成り歩に変換
-				console.log(`✨ ${piece} に成りました！`);
-			}
-		}
+    // ✅ 7. 成る処理
+    if (promote) {
+      const promotionMap = {
+        P: "PP",
+        p: "pp",
+        S: "PS",
+        s: "ps",
+        N: "PN",
+        n: "pn",
+        L: "PL",
+        l: "pl",
+        R: "PR",
+        r: "pr",
+        B: "PB",
+        b: "pb",
+      };
 
-		// ✅ 「成らない」を選択した場合も駒を移動
-		room.board[actualToX][actualToY] = piece; // 駒を移動
-		room.board[actualFromX][actualFromY] = null; // 元の位置を空にする
+      if (promotionMap[piece]) {
+        piece = promotionMap[piece];
+      }
+    }
 
-		console.log(`🚀 駒を移動: ${actualFromX},${actualFromY} → ${actualToX},${actualToY}, 成り=${promote}`);
+    // ✅ 8. 駒を移動
+    room.board[actualToX][actualToY] = piece;
+    room.board[actualFromX][actualFromY] = null;
 
-		room.board[actualFromX][actualFromY] = null;
+    console.log(
+      `🚀 駒を移動: ${actualFromX},${actualFromY} → ${actualToX},${actualToY}, 成り=${promote}`
+    );
 
-    // ✅ ターン交代
+    // ✅ 9. ターン交代
     room.currentPlayer = isFirstPlayer
       ? room.secondPlayer.id
       : room.firstPlayer.id;
 
-    // ✅ `logs` を初期化
-    if (!room.logs) {
-      room.logs = [];
-    }
-
-    // ✅ ログの記録（後手視点の変換を追加）
+    // ✅ 10. ログ記録
     const rowLabels = ["一", "二", "三", "四", "五", "六", "七", "八", "九"];
     const colLabels = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
-
     let displayToX = actualToX;
     let displayToY = 8 - actualToY;
-
-    // ✅ 駒の種類をログに反映
     const pieceName = pieceNames[piece] || "駒";
 
-    // ✅ 移動後のログを追加
-    const moveLog = `${isFirstPlayer ? "先手" : "後手"}: ${
-      colLabels[displayToY]
-    }${rowLabels[displayToX]}${pieceName}`;
-    room.logs.push(moveLog);
+    room.logs.push(
+      `${isFirstPlayer ? "先手" : "後手"}: ${colLabels[displayToY]}${
+        rowLabels[displayToX]
+      }${pieceName}`
+    );
 
-    // ✅ ターン交代のログを追加
-    const turnLog = `ターン交代: 次のプレイヤー -> ${
-      room.currentPlayer === room.firstPlayer.id ? "先手" : "後手"
-    } (${room.currentPlayer})`;
-    room.logs.push(turnLog);
-
-    // ✅ 全クライアントにイベント送信
+    // ✅ 11. クライアントに更新を通知
     req.app.get("io").emit("update-board", {
       board: room.board,
       currentPlayer: room.currentPlayer,
