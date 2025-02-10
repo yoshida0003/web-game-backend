@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 // ボードの初期化関数
-const initializeBoard = () => {
+let initializeBoard = () => {
   const board = Array(9)
     .fill(null)
     .map(() => Array(9).fill(null));
@@ -68,7 +68,7 @@ const initializeBoard = () => {
 };
 
 // ボードの内容を確認
-const board = initializeBoard();
+let board = initializeBoard();
 console.log("🔍 初期化されたボード全体:");
 console.table(board);
 
@@ -103,8 +103,10 @@ const pieceMovementRules = {
   },
 
   // 先手の飛車の移動範囲
-  R: (fromX, fromY, toX, toY, board) => {
+  R: (fromX, fromY, toX, toY) => {
     if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
+    console.log("boardの中身");
+    console.table(board); // ←ここを修正
 
     const directionX = fromX === toX ? 0 : toX > fromX ? 1 : -1; // 左右移動
     const directionY = fromY === toY ? 0 : toY > fromY ? 1 : -1; // 上下移動
@@ -121,7 +123,7 @@ const pieceMovementRules = {
   },
 
   // 後手の飛車の移動範囲
-  r: (fromX, fromY, toX, toY, board) => {
+  r: (fromX, fromY, toX, toY) => {
     if (fromX !== toX && fromY !== toY) return false; // ❌ 縦横以外の移動は禁止
 
     const directionX = fromX === toX ? 0 : toX > fromX ? 1 : -1;
@@ -139,7 +141,7 @@ const pieceMovementRules = {
   },
 
   // 先手の角の移動範囲
-  B: (fromX, fromY, toX, toY, board) => {
+  B: (fromX, fromY, toX, toY) => {
     if (Math.abs(fromX - toX) !== Math.abs(fromY - toY)) return false; // ❌ 斜め移動のみ可能
 
     const directionX = toX > fromX ? 1 : -1;
@@ -156,7 +158,7 @@ const pieceMovementRules = {
     return true;
   },
   // 後手の角の移動範囲
-  b: (fromX, fromY, toX, toY, board) => {
+  b: (fromX, fromY, toX, toY) => {
     if (Math.abs(fromX - toX) !== Math.abs(fromY - toY)) return false;
 
     const directionX = toX > fromX ? 1 : -1;
@@ -225,7 +227,7 @@ const pieceMovementRules = {
   },
 
   // 先手の香車の移動範囲
-  L: (fromX, fromY, toX, toY, board) => {
+  L: (fromX, fromY, toX, toY) => {
     if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
     if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
 
@@ -248,7 +250,7 @@ const pieceMovementRules = {
   },
 
   // 後手の香車の移動範囲
-  l: (fromX, fromY, toX, toY, board) => {
+  l: (fromX, fromY, toX, toY) => {
     if (fromY < 0 || fromY > 8) return false; // ❌ Y座標の範囲外チェック
     if (fromX === toX || fromY !== toY) return false; // ❌ 縦移動のみ許可
 
@@ -384,6 +386,7 @@ router.post("/move-piece", function (req, res) {
     }
 
     const isFirstPlayer = room.currentPlayer === room.firstPlayer.id;
+    board = room.board;
 
     // 駒台が未定義なら初期化
     if (!room.capturedPieces) {
@@ -444,6 +447,7 @@ router.post("/move-piece", function (req, res) {
         room.board
       )
     ) {
+      console.log(room.board);
       return res.status(400).json({ message: "不正な移動です" });
     }
 
@@ -488,6 +492,8 @@ router.post("/move-piece", function (req, res) {
     console.log(
       `🚀 駒を移動: ${actualFromX},${actualFromY} → ${actualToX},${actualToY}, 成り=${promote}`
     );
+
+    console.table(room.board);
 
     // ✅ 9. ターン交代
     room.currentPlayer = isFirstPlayer
