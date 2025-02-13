@@ -535,3 +535,5 @@ router.post("/move-piece", function (req, res) {
 });
 
 module.exports = { router, initializeBoard };
+
+// test
