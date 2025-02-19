@@ -48,21 +48,25 @@ let initializeBoard = () => {
   board[0][2] = "s";
   board[0][6] = "s";
 
-	// 先手の桂馬を2九と8九に配置
-	board[8][1] = "N";
-	board[8][7] = "N";
+  // 先手の桂馬を2九と8九に配置
+  board[8][1] = "N";
+  board[8][7] = "N";
 
-	// 後手の桂馬を2一と8一に配置
-	board[0][1] = "n";
-	board[0][7] = "n";
+  // 後手の桂馬を2一と8一に配置
+  board[0][1] = "n";
+  board[0][7] = "n";
 
-	// 先手の香車を1九と9九に配置	
-	board[8][0] = "L";
+  // 先手の香車を1九と9九に配置
+  board[8][0] = "L";
   board[8][8] = "L";
 
-  // 後手の香��を1一と9一に配置
+  // 後手の香車を1一と9一に配置
   board[0][0] = "l";
   board[0][8] = "l";
+
+  // ✅ 駒台を初期化
+  board.firstCaptured = [];
+  board.secondCaptured = [];
 
   return board;
 };
@@ -400,6 +404,17 @@ router.post("/move-piece", function (req, res) {
     const actualToY = isFirstPlayer ? toY : 8 - toY;
     let piece = room.board[actualFromX]?.[actualFromY];
 
+    // ✅ 駒台からの駒の場合
+    if (fromX === 9) {
+      console.log("🟢 先手の駒台から駒を取得");
+      piece = board.firstCaptured[fromY]; // 駒台の駒を取得
+      board.firstCaptured.splice(fromY, 1); // 取得した駒を削除
+    } else if (fromX === 10) {
+      console.log("🟢 後手の駒台から駒を取得");
+      piece = board.secondCaptured[fromY]; // 駒台の駒を取得
+      board.secondCaptured.splice(fromY, 1); // 取得した駒を削除
+    }
+
     // ✅ 1. 駒がない場合はエラー
     if (!piece) {
       return res.status(400).json({ message: "移動できる駒がありません" });
@@ -413,9 +428,16 @@ router.post("/move-piece", function (req, res) {
     }
 
     // ✅ 3. 自分の駒かチェック
-    const isOwnPiece =
+    let isOwnPiece =
       (isFirstPlayer && piece === piece.toUpperCase()) ||
       (!isFirstPlayer && piece === piece.toLowerCase());
+
+    // ✅ 駒台から出す場合は必ず自分の駒と判定
+    if (fromX === 9 || fromX === 10) {
+      isOwnPiece = true;
+    }
+
+    console.log(isOwnPiece);
 
     if (!isOwnPiece) {
       return res.status(400).json({ message: "相手の駒は動かせません" });
@@ -435,31 +457,55 @@ router.post("/move-piece", function (req, res) {
       }
     }
 
-    // ✅ 5. 移動ルールのチェック
+    // ✅ 5. 移動ルールのチェック（駒台からの駒はスキップ）
     if (
-      !pieceMovementRules[piece] ||
-      !pieceMovementRules[piece](
-        actualFromX,
-        actualFromY,
-        actualToX,
-        actualToY,
-        isFirstPlayer,
-        room.board
-      )
+      fromX !== 9 &&
+      fromX !== 10 && // 駒台からの移動でなければチェックする
+      (!pieceMovementRules[piece] ||
+        !pieceMovementRules[piece](
+          actualFromX,
+          actualFromY,
+          actualToX,
+          actualToY,
+          isFirstPlayer,
+          room.board
+        ))
     ) {
       console.log(room.board);
       return res.status(400).json({ message: "不正な移動です" });
     }
 
-    // ✅ 6. 相手の駒を取ったら駒台に追加
     if (targetPiece) {
-      const capturedPiece = targetPiece.toUpperCase();
+      // 成った駒を元の駒に戻す
+      const demotionMap = {
+        PP: "P",
+        pp: "p",
+        PS: "S",
+        ps: "s",
+        PN: "N",
+        pn: "n",
+        PL: "L",
+        pl: "l",
+        PR: "R",
+        pr: "r",
+        PB: "B",
+        pb: "b",
+      };
+      const capturedPiece = demotionMap[targetPiece] || targetPiece;
       const owner = isFirstPlayer ? "second" : "first";
 
       if (isFirstPlayer) {
-        room.capturedPieces.firstPlayer.push({ piece: capturedPiece, owner });
+        room.capturedPieces.secondPlayer.push({
+          piece: capturedPiece.toLowerCase(),
+          owner,
+        });
+        board.secondCaptured.push(capturedPiece.toLowerCase()); // 後手の駒台に追加
       } else {
-        room.capturedPieces.secondPlayer.push({ piece: capturedPiece, owner });
+        room.capturedPieces.firstPlayer.push({
+          piece: capturedPiece.toUpperCase(),
+          owner,
+        });
+        board.firstCaptured.push(capturedPiece.toUpperCase()); // 先手の駒台に追加
       }
     }
 
@@ -485,15 +531,23 @@ router.post("/move-piece", function (req, res) {
       }
     }
 
-    // ✅ 8. 駒を移動
+    // ✅ 駒を移動（駒台からの駒も含む）
     room.board[actualToX][actualToY] = piece;
-    room.board[actualFromX][actualFromY] = null;
+
+    // ✅ `actualFromX` が存在する場合のみ `null` を代入
+    if (room.board[actualFromX]) {
+      room.board[actualFromX][actualFromY] = null;
+    }
 
     console.log(
       `🚀 駒を移動: ${actualFromX},${actualFromY} → ${actualToX},${actualToY}, 成り=${promote}`
     );
 
     console.table(room.board);
+
+    // 駒台の配列をログに表示
+    console.log("先手の駒台:", room.capturedPieces.firstPlayer);
+    console.log("後手の駒台:", room.capturedPieces.secondPlayer);
 
     // ✅ 9. ターン交代
     room.currentPlayer = isFirstPlayer
