@@ -475,39 +475,39 @@ router.post("/move-piece", function (req, res) {
       return res.status(400).json({ message: "不正な移動です" });
     }
 
-    if (targetPiece) {
-      // 成った駒を元の駒に戻す
-      const demotionMap = {
-        PP: "P",
-        pp: "p",
-        PS: "S",
-        ps: "s",
-        PN: "N",
-        pn: "n",
-        PL: "L",
-        pl: "l",
-        PR: "R",
-        pr: "r",
-        PB: "B",
-        pb: "b",
-      };
-      const capturedPiece = demotionMap[targetPiece] || targetPiece;
-      const owner = isFirstPlayer ? "second" : "first";
+		if (targetPiece) {
+			// 成った駒を元の駒に戻す
+			const demotionMap = {
+				PP: "P",
+				pp: "p",
+				PS: "S",
+				ps: "s",
+				PN: "N",
+				pn: "n",
+				PL: "L",
+				pl: "l",
+				PR: "R",
+				pr: "r",
+				PB: "B",
+				pb: "b",
+			};
+			const capturedPiece = demotionMap[targetPiece] || targetPiece;
+			const owner = isFirstPlayer ? "first" : "second"; // 修正: 取得した側の所有者を正しく設定
 
-      if (isFirstPlayer) {
-        room.capturedPieces.secondPlayer.push({
-          piece: capturedPiece.toLowerCase(),
-          owner,
-        });
-        board.secondCaptured.push(capturedPiece.toLowerCase()); // 後手の駒台に追加
-      } else {
-        room.capturedPieces.firstPlayer.push({
-          piece: capturedPiece.toUpperCase(),
-          owner,
-        });
-        board.firstCaptured.push(capturedPiece.toUpperCase()); // 先手の駒台に追加
-      }
-    }
+			if (isFirstPlayer) {
+				room.capturedPieces.firstPlayer.push({
+					piece: capturedPiece.toUpperCase(), // 取得した駒を大文字に変換
+					owner,
+				});
+				board.firstCaptured.push(capturedPiece.toUpperCase()); // 先手の駒台に追加
+			} else {
+				room.capturedPieces.secondPlayer.push({
+					piece: capturedPiece.toLowerCase(), // 取得した駒を小文字に変換
+					owner,
+				});
+				board.secondCaptured.push(capturedPiece.toLowerCase()); // 後手の駒台に追加
+			}
+		}
 
     // ✅ 7. 成る処理
     if (promote) {
