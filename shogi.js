@@ -410,27 +410,25 @@ const isSquareAttacked = (board, x, y, isFirstPlayer) => {
   return false;
 };
 
+const isOwnPiece = (piece, isFirstPlayer) => {
+  return isFirstPlayer
+    ? piece === piece.toUpperCase()
+    : piece === piece.toLowerCase();
+};
 
-// 玉が詰みかのチェック
-const isKingInCheckmate = (board, kingPosition, isFirstPlayer) => {
+// 玉が詰みかのチェック（王の移動 + 王手回避の駒移動 + 駒打ちでの王手回避）
+const isKingInCheckmate = (board, kingPosition, isFirstPlayer, capturedPieces) => {
   if (!kingPosition) {
     console.log("🚨 王の位置が見つかりません");
     return false;
   }
 
-  console.log(
-    `🔍 詰みチェック: 王の位置 (${kingPosition.x}, ${kingPosition.y})`
-  );
+  console.log(`🔍 詰みチェック: 王の位置 (${kingPosition.x}, ${kingPosition.y})`);
 
+  // **1️⃣ 王の移動で回避できるかチェック**
   const directions = [
-    { x: -1, y: 0 },
-    { x: 1, y: 0 },
-    { x: 0, y: -1 },
-    { x: 0, y: 1 },
-    { x: -1, y: -1 },
-    { x: -1, y: 1 },
-    { x: 1, y: -1 },
-    { x: 1, y: 1 },
+    { x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }, { x: 0, y: 1 },
+    { x: -1, y: -1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: 1, y: 1 },
   ];
 
   for (const direction of directions) {
@@ -442,31 +440,101 @@ const isKingInCheckmate = (board, kingPosition, isFirstPlayer) => {
       newX < 9 &&
       newY >= 0 &&
       newY < 9 &&
-      !board[newX][newY] &&
-      !isSquareAttacked(board, newX, newY, isFirstPlayer)
+      !board[newX][newY] // 移動先が空きマス
     ) {
-      console.log(`✅ 逃げ道あり: (${newX}, ${newY})`);
-      return false;
+      // **王を仮に移動して王手を受けるかチェック**
+      const tempBoard = JSON.parse(JSON.stringify(board));
+      tempBoard[kingPosition.x][kingPosition.y] = null;
+      tempBoard[newX][newY] = isFirstPlayer ? "K" : "k";
+
+      if (!isSquareAttacked(tempBoard, newX, newY, isFirstPlayer)) {
+        console.log(`✅ 逃げ道あり: (${newX}, ${newY})`);
+        return false; // 王が移動できるなら詰みではない
+      }
     }
+  }
+
+  // **2️⃣ 王手をかけている駒を取得**
+  const attackingPieces = getAttackingPieces(board, kingPosition.x, kingPosition.y, isFirstPlayer);
+  console.log("⚠️ 王手をかけている駒:", attackingPieces);
+
+  // **3️⃣ 攻撃駒を取ることができるかチェック**
+  for (const attacker of attackingPieces) {
+    for (let x = 0; x < 9; x++) {
+      for (let y = 0; y < 9; y++) {
+        const piece = board[x][y];
+
+        if (piece && isOwnPiece(piece, isFirstPlayer)) {
+          if (pieceMovementRules[piece] && pieceMovementRules[piece](x, y, attacker.x, attacker.y, isFirstPlayer, board)) {
+            console.log(`✅ ${piece} (${x}, ${y}) → (${attacker.x}, ${attacker.y}) で王手回避可能！`);
+            return false;
+          }
+        }
+      }
+    }
+  }
+
+  // **4️⃣ 合駒（駒を打つ or 動かす）で王手回避可能かチェック**
+  for (let x = 0; x < 9; x++) {
+    for (let y = 0; y < 9; y++) {
+      if (!board[x][y]) { // 空きマスのみ対象
+        if (canBlockCheck(board, kingPosition, { x, y }, attackingPieces)) {
+          console.log(`✅ (${x}, ${y}) に駒を置けば王手回避可能！`);
+          return false;
+        }
+      }
+    }
+  }
+
+  // **5️⃣ 駒台から駒を打って王手回避できるかチェック**
+  if (canBlockCheckWithDrop(board, kingPosition, attackingPieces, capturedPieces, isFirstPlayer)) {
+    console.log(`✅ 駒台から駒を打つことで王手回避可能！`);
+    return false;
   }
 
   console.log("🚨 詰み！王が逃げられません");
   return true;
 };
 
+// **🔹 駒台から駒を打って王手を防げるかチェック**
+const canBlockCheckWithDrop = (board, kingPos, attackingPieces, capturedPieces, isFirstPlayer) => {
+  const availableDrops = isFirstPlayer ? capturedPieces.firstPlayer : capturedPieces.secondPlayer;
+
+  for (const attacker of attackingPieces) {
+    if (["R", "r", "B", "b", "L", "l"].includes(attacker.piece)) {
+      for (const piece of availableDrops) {
+        for (let x = 0; x < 9; x++) {
+          for (let y = 0; y < 9; y++) {
+            if (!board[x][y]) {
+              if (isPieceBlocking(kingPos, { x: attacker.x, y: attacker.y }, { x, y })) {
+                console.log(`✅ 駒台の ${piece.piece} を (${x}, ${y}) に打てば王手回避！`);
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return false;
+};
+
 const isMoveLegal = (board, fromX, fromY, toX, toY, isFirstPlayer) => {
-  const tempBoard = JSON.parse(JSON.stringify(board)); // 盤面をコピー（元の状態を保持）
+  const tempBoard = JSON.parse(JSON.stringify(board)); // 盤面をコピー
   const piece = tempBoard[fromX][fromY];
-  const targetPiece = tempBoard[toX][toY]; // 取る駒
 
-  // ① 移動（駒を取る場合も考慮）
+  // **移動**
   tempBoard[fromX][fromY] = null;
-  tempBoard[toX][toY] = piece; // 移動先に駒を置く（取った駒は消える）
+  tempBoard[toX][toY] = piece;
 
-  // ② 玉の位置を取得
+  // **玉の位置を取得**
   const kingPosition = getKingPosition(tempBoard, isFirstPlayer);
+  if (!kingPosition) {
+    console.log("🚨 王の位置が見つかりません");
+    return false;
+  }
 
-  // ③ 王手をかけている駒のリストを取得
+  // **移動後に王手をかけている駒のリストを取得**
   const attackingPieces = getAttackingPieces(
     tempBoard,
     kingPosition.x,
@@ -474,20 +542,20 @@ const isMoveLegal = (board, fromX, fromY, toX, toY, isFirstPlayer) => {
     isFirstPlayer
   );
 
-  // ④ 王を狙っている駒を取れるかチェック
+  console.log(`⚠️ 移動後の王手判定:`, attackingPieces);
+
+  // **王手を回避するために攻撃駒を取る手があるかチェック**
   const canCaptureAttacker = attackingPieces.some(
     (attacker) => attacker.x === toX && attacker.y === toY
   );
 
   if (canCaptureAttacker) {
-    console.log(
-      `✅ 駒取り成功！${piece} が (${toX}, ${toY}) の駒を取ることで王手解除`
-    );
-    return true; // 攻撃駒を取って王手解除できるなら合法手
+    console.log(`✅ 攻撃駒 (${toX}, ${toY}) を取ることで王手解除！`);
+    return true;
   }
 
-  // ⑤ 合駒チェック（王と攻撃駒の間に指す手）
-  const isBlocked = attackingPieces.some((attacker) =>
+  // **合駒（駒を間に指して王手を防ぐ）をチェック**
+  const canBlock = attackingPieces.some((attacker) =>
     isPieceBlocking(
       kingPosition,
       { x: attacker.x, y: attacker.y },
@@ -495,17 +563,17 @@ const isMoveLegal = (board, fromX, fromY, toX, toY, isFirstPlayer) => {
     )
   );
 
-  if (isBlocked) {
-    console.log(`✅ 合駒成功！駒 (${toX}, ${toY}) を置けば王手解除`);
+  if (canBlock) {
+    console.log(`✅ 合駒成功！(${toX}, ${toY}) に駒を指せば王手解除`);
     return true;
   }
 
-  // ⑥ 王手が続いているなら「非合法手」
+  // **移動後に自分の王が王手を受けているなら非合法手**
   if (
     isSquareAttacked(tempBoard, kingPosition.x, kingPosition.y, isFirstPlayer)
   ) {
     console.log(
-      `🚨 非合法手！(${fromX}, ${fromY}) → (${toX}, ${toY}) は王手が続く`
+      `🚨 非合法手！(${fromX}, ${fromY}) → (${toX}, ${toY}) は王手が掛かります！`
     );
     return false;
   }
@@ -513,6 +581,7 @@ const isMoveLegal = (board, fromX, fromY, toX, toY, isFirstPlayer) => {
   console.log(`✅ 合法手: (${fromX}, ${fromY}) → (${toX}, ${toY})`);
   return true;
 };
+
 
 const getAttackingPieces = (board, kingX, kingY, isFirstPlayer) => {
   const attackingPieces = [];
@@ -569,7 +638,6 @@ const isPieceBlocking = (kingPos, attackerPos, blockPos) => {
   }
   return false;
 };
-
 
 // 駒の移動 API (ドラッグ＆ドロップ用)
 router.post("/move-piece", function (req, res) {
@@ -858,7 +926,7 @@ router.post("/move-piece", function (req, res) {
       console.log(
         `⚠️ ${isFirstPlayer ? "後手" : "先手"}の王が王手を受けています！`
       );
-      if (isKingInCheckmate(room.board, opponentKingPosition, !isFirstPlayer)) {
+      if (isKingInCheckmate(room.board, opponentKingPosition, !isFirstPlayer, room.capturedPieces)) {
         const winner = isFirstPlayer
           ? room.firstPlayer.id
           : room.secondPlayer.id;
