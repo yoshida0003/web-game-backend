@@ -150,37 +150,59 @@ app.use("/api/shogi", shogiRouter);
 
 // Socket.ioのイベント処理
 io.on("connection", (socket) => {
-	const { roomId } = socket.handshake.query;
-	console.log("✅ ユーザー接続:", { socketId: socket.id, roomId });
-
-	if (roomId) {
-		socket.join(roomId);
-		console.log(`✅ ${socket.id} がルーム ${roomId} に参加しました`);
-	}
-
-  console.log("ユーザーが接続しました");
-  socket.emit("server-log", "ユーザーが接続しました");
+  console.log("✅ ユーザー接続:", { socketId: socket.id });
 
   socket.on("join-room", ({ roomId, userId, username }) => {
     socket.join(roomId);
-    io.to(roomId).emit(
-      "server-log",
-      `${username}さんが部屋${roomId}に参加しました`
-    );
-  });
+    socket.roomId = roomId; // 🔹 クライアントに roomId を保存
+    socket.userId = userId; // 🔹 クライアントに userId を保存
+    console.log(`🔹 ${username} さんが部屋 ${roomId} に参加しました`);
 
-  socket.on("leave-room", ({ roomId, userId, username }) => {
-    socket.leave(roomId);
-    console.log(`ユーザーID: ${userId}が部屋${roomId}から退出しました`);
     io.to(roomId).emit(
       "server-log",
-      `ユーザーID: ${userId}が部屋${roomId}から退出しました`
+      `${username} さんが部屋 ${roomId} に参加しました`
     );
   });
 
   socket.on("disconnect", () => {
-    console.log("ユーザーが切断しました");
-    socket.emit("server-log", "ユーザーが切断しました");
+    console.log("🚨 ユーザーが切断しました:", socket.id);
+
+    const roomId = socket.roomId;
+    const userId = socket.userId;
+
+    if (!roomId || !rooms[roomId]) {
+      console.log("🚨 エラー: 部屋の情報が見つかりません");
+      return;
+    }
+
+    const room = rooms[roomId];
+
+    // 切断したユーザーを削除
+    room.users = room.users.filter((user) => user.id !== userId);
+
+    if (room.users.length === 0) {
+      delete rooms[roomId];
+      console.log(`🗑 部屋 ${roomId} を削除しました`);
+      return;
+    }
+
+    const isFirstPlayer = room.firstPlayer && room.firstPlayer.id === userId;
+    const isSecondPlayer = room.secondPlayer && room.secondPlayer.id === userId;
+    let winner = null;
+
+    if (isFirstPlayer) {
+      winner = room.secondPlayer ? room.secondPlayer.id : null;
+    } else if (isSecondPlayer) {
+      winner = room.firstPlayer ? room.firstPlayer.id : null;
+    }
+
+    if (winner) {
+      io.to(roomId).emit("game-over", {
+        message: "相手が切断しました！",
+        winner,
+      });
+      console.log(`🎉 勝者: ${winner}`);
+    }
   });
 });
 
