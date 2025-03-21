@@ -1,4 +1,4 @@
-const express = require("express");
+import express from "express";
 const router = express.Router();
 
 // ボードの初期化関数
@@ -283,7 +283,6 @@ const pieceMovementRules = {
         console.log("🚨 範囲外エラー", x, fromY);
         return false; // ❌ 盤外チェック
       }
-
 
       // **途中の駒チェック**
       if (board[x]?.[fromY]) {
@@ -1119,36 +1118,8 @@ const canKingEscape = (board, kingPos, isFirstPlayer) => {
 // isDropPawnMate関数の補助関数
 const canPieceCapture = (board, x, y, isFirstPlayer) => {
   const opponentPieces = isFirstPlayer
-    ? [
-        "P",
-        "R",
-        "B",
-        "G",
-        "S",
-        "N",
-        "L",
-        "PP",
-        "PR",
-        "PB",
-        "PS",
-        "PN",
-        "PL",
-      ]
-    : [
-        "p",
-        "r",
-        "b",
-        "g",
-        "s",
-        "n",
-        "l",
-        "pp",
-        "pr",
-        "pb",
-        "ps",
-        "pn",
-        "pl",
-      ];
+    ? ["P", "R", "B", "G", "S", "N", "L", "PP", "PR", "PB", "PS", "PN", "PL"]
+    : ["p", "r", "b", "g", "s", "n", "l", "pp", "pr", "pb", "ps", "pn", "pl"];
 
   for (let fromX = 0; fromX < 9; fromX++) {
     for (let fromY = 0; fromY < 9; fromY++) {
@@ -1195,7 +1166,7 @@ const isValidDropPosition = (piece, toX, isFirstPlayer) => {
   }
 
   return true;
-}
+};
 
 // 駒の移動 API (ドラッグ＆ドロップ用)
 router.post("/move-piece", function (req, res) {
@@ -1316,8 +1287,21 @@ router.post("/move-piece", function (req, res) {
     }
 
     // ✅ 王手を防いでいる駒を動かせないようにチェック
-    if (fromX !== 9 && fromX !== 10 && isPieceBlockingCheck(room.board, actualFromX, actualFromY, actualToX, actualToY, isFirstPlayer)) {
-      return res.status(400).json({ message: "その駒は王手を防いでいるので動かせません！" });
+    if (
+      fromX !== 9 &&
+      fromX !== 10 &&
+      isPieceBlockingCheck(
+        room.board,
+        actualFromX,
+        actualFromY,
+        actualToX,
+        actualToY,
+        isFirstPlayer
+      )
+    ) {
+      return res
+        .status(400)
+        .json({ message: "その駒は王手を防いでいるので動かせません！" });
     }
 
     // ✅ 自分の駒かチェック
@@ -1348,13 +1332,24 @@ router.post("/move-piece", function (req, res) {
       }
 
       // ✅ 打ち歩詰めのチェックを追加
-      if (isDropPawnMate(room.board, actualToX, actualToY, isFirstPlayer, room.capturedPieces)) {
+      if (
+        isDropPawnMate(
+          room.board,
+          actualToX,
+          actualToY,
+          isFirstPlayer,
+          room.capturedPieces
+        )
+      ) {
         return res.status(400).json({ message: "打ち歩詰めは禁止です！" });
       }
     }
 
     // 打った場所が合法かチェック
-    if((fromX === 9 || fromX === 10) && !isValidDropPosition(piece, actualToX, isFirstPlayer)) {
+    if (
+      (fromX === 9 || fromX === 10) &&
+      !isValidDropPosition(piece, actualToX, isFirstPlayer)
+    ) {
       return res.status(400).json({ message: "その位置には打てません！" });
     }
 
@@ -1849,4 +1844,4 @@ router.post("/resign", function (req, res) {
   }
 });
 
-module.exports = { router, initializeBoard };
+export { router, initializeBoard };
