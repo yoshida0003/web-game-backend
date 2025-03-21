@@ -1,15 +1,22 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const { v4: uuidv4 } = require("uuid");
-const cors = require("cors");
-const { router: shogiRouter, initializeBoard } = require("./shogi");
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import { v4 as uuidv4 } from "uuid";
+import cors from "cors";
+import { router as shogiRouter, initializeBoard } from "./shogi.js";
+import registerHandler from "./pages/api/register.js";
+import loginHandler from "./pages/api/login.js";
+import verifyTokenHandler from "./pages/api/verifyToken.js";
+import dotenv from "dotenv";
+
+// 環境変数の読み込み
+dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // クライアントのURL
+    origin: "http://localhost:3000",
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -22,6 +29,15 @@ app.set("io", io);
 
 const rooms = {};
 app.set("rooms", rooms);
+
+// ユーザー登録エンドポイント
+app.post("/api/register", registerHandler);
+
+// ログインエンドポイント
+app.post("/api/login", loginHandler);
+
+// JWT検証エンドポイント
+app.post("/api/verify-token", verifyTokenHandler);
 
 // ルーム作成エンドポイント
 app.post("/api/create-room", function (req, res) {
@@ -53,7 +69,6 @@ app.post("/api/join-room", function (req, res) {
   if (roomId) {
     const room = rooms[roomId];
 
-    // 将棋の場合、部屋のユーザー数を2人に制限
     if (room.gameType === "shogi" && room.users.length >= 2) {
       return res.status(403).json({ message: "部屋がいっぱいです" });
     }
@@ -62,7 +77,6 @@ app.post("/api/join-room", function (req, res) {
     rooms[roomId].users.push({ id: userId, username });
     res.json({ roomId, userId });
 
-    // 全クライアントにユーザーが参加したことを通知
     io.to(roomId).emit("user-joined", { userId, username });
     console.log(`${username}さんが部屋${roomId}に入室しました。`);
   } else {
@@ -82,15 +96,13 @@ app.post("/api/leave-room", function (req, res) {
       const user = room.users[userIndex];
       room.users.splice(userIndex, 1);
 
-      // 他のクライアントにユーザーが退出したことを通知
       io.to(roomId).emit("user-left", { userId, username: user.username });
       console.log(`${user.username}さんが部屋${roomId}から退出しました。`);
     }
 
-    // 部屋が空の場合は削除
     if (room.users.length === 0) {
       delete rooms[roomId];
-      io.to(roomId).emit("room-deleted"); // 部屋が削除されたことを通知
+      io.to(roomId).emit("room-deleted");
       console.log(`部屋${roomId}が削除されました`);
     }
 
@@ -113,40 +125,40 @@ app.get("/api/room/:roomId", function (req, res) {
 
 // ゲーム開始のエンドポイント
 app.post("/api/start-game", function (req, res) {
-	const { roomId } = req.body;
-	const room = rooms[roomId];
+  const { roomId } = req.body;
+  const room = rooms[roomId];
 
-	if (room && room.users.length === 2) {
-		room.gameStarted = true;
-		room.board = initializeBoard();
+  if (room && room.users.length === 2) {
+    room.gameStarted = true;
+    room.board = initializeBoard();
 
-		// 先手後手をランダムで決定
-		const [firstPlayer, secondPlayer] = room.users.sort(() => Math.random() - 0.5);
-		room.firstPlayer = firstPlayer;
-		room.secondPlayer = secondPlayer;
-		room.currentPlayer = firstPlayer.id;
+    const [firstPlayer, secondPlayer] = room.users.sort(
+      () => Math.random() - 0.5
+    );
+    room.firstPlayer = firstPlayer;
+    room.secondPlayer = secondPlayer;
+    room.currentPlayer = firstPlayer.id;
 
-		// ✅ logs を初期化
-		room.logs = [];
+    room.logs = [];
 
-		io.to(roomId).emit("game-started", {
-			board: room.board,
-			firstPlayer,
-			secondPlayer,
-			logs: room.logs, // ✅ クライアントにも logs を送信
-		});
+    io.to(roomId).emit("game-started", {
+      board: room.board,
+      firstPlayer,
+      secondPlayer,
+      logs: room.logs,
+    });
 
-		console.log(
-			`部屋${roomId}のゲームを開始しました! 先手: ${firstPlayer.username}, 後手: ${secondPlayer.username}`
-		);
-		res.json({ message: "Game started" });
-	} else {
-		res.status(400).json({ message: "ゲームが始められません" });
-	}
+    console.log(
+      `部屋${roomId}のゲームを開始しました! 先手: ${firstPlayer.username}, 後手: ${secondPlayer.username}`
+    );
+    res.json({ message: "Game started" });
+  } else {
+    res.status(400).json({ message: "ゲームが始められません" });
+  }
 });
 
-
 app.use("/api/shogi", shogiRouter);
+
 
 // Socket.ioのイベント処理
 io.on("connection", (socket) => {
@@ -154,8 +166,8 @@ io.on("connection", (socket) => {
 
   socket.on("join-room", ({ roomId, userId, username }) => {
     socket.join(roomId);
-    socket.roomId = roomId; // 🔹 クライアントに roomId を保存
-    socket.userId = userId; // 🔹 クライアントに userId を保存
+    socket.roomId = roomId;
+    socket.userId = userId;
     console.log(`🔹 ${username} さんが部屋 ${roomId} に参加しました`);
 
     io.to(roomId).emit(
@@ -177,7 +189,6 @@ io.on("connection", (socket) => {
 
     const room = rooms[roomId];
 
-    // 切断したユーザーを削除
     room.users = room.users.filter((user) => user.id !== userId);
 
     if (room.users.length === 0) {
