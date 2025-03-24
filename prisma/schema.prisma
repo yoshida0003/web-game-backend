@@ -22,4 +22,3 @@ model User {
   isAdmin         Boolean  @default(false)
 }
 
-

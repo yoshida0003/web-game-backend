@@ -2,9 +2,10 @@
 CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "name" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
     "nickname" TEXT NOT NULL,
     "shogi_rating" INTEGER NOT NULL DEFAULT 1500,
+    "isAdmin" BOOLEAN NOT NULL DEFAULT false,
 
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
