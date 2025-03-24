@@ -6,6 +6,8 @@ import cors from "cors";
 import { router as shogiRouter, initializeBoard } from "./shogi.js";
 import registerHandler from "./pages/api/register.js";
 import loginHandler from "./pages/api/login.js";
+import addNgWordHandler from "./pages/api/addNgWord.js"; 
+import importNgWordsHandler from "./pages/api/importNgWords.js"; 
 import verifyTokenHandler from "./pages/api/verifyToken.js";
 import dotenv from "dotenv";
 
@@ -35,6 +37,12 @@ app.post("/api/register", registerHandler);
 
 // ログインエンドポイント
 app.post("/api/login", loginHandler);
+
+// NGワード追加エンドポイント
+app.post("/api/addNgWord", addNgWordHandler); 
+
+// NGワードインポートエンドポイント
+app.post("/api/importNgWords", importNgWordsHandler); 
 
 // JWT検証エンドポイント
 app.post("/api/verify-token", verifyTokenHandler);
@@ -71,6 +79,10 @@ app.post("/api/join-room", function (req, res) {
 
     if (room.gameType === "shogi" && room.users.length >= 2) {
       return res.status(403).json({ message: "部屋がいっぱいです" });
+    }
+
+    if (room.gameType === "ng-word" && room.users.length >= 6) {
+      return res.status(403).json({ message: "NGワードの部屋がいっぱいです" });
     }
 
     const userId = uuidv4().substring(0, 6);
@@ -159,6 +171,25 @@ app.post("/api/start-game", function (req, res) {
 
 app.use("/api/shogi", shogiRouter);
 
+// NGワードのゲーム開始のエンドポイント
+app.post("/api/start-ng-word-game", function (req, res) {
+  const { roomId } = req.body;
+  const room = rooms[roomId];
+
+  if (room && room.users.length >= 2) {
+    room.gameStarted = true;
+
+    io.to(roomId).emit("ng-word-game-started", {
+      message: "NGワードゲームが開始されました！",
+      users: room.users,
+    });
+
+    console.log(`部屋${roomId}のNGワードゲームを開始しました!`);
+    res.json({ message: "NGワードゲームが開始されました" });
+  } else {
+    res.status(400).json({ message: "ゲームを開始するには2人以上が必要です" });
+  }
+});
 
 // Socket.ioのイベント処理
 io.on("connection", (socket) => {
