@@ -50,7 +50,7 @@ export default async function handler(req, res) {
         });
     } catch (error) {
       console.log("❌ サーバーでエラー発生:", error);
-      res.status(500).json({ message: "ログイン中にエラーが発生しました。" });
+      res.status(500).json({ message: "ログイン中にエラーが発生しました。", error: error.message, stack: error.stack });
     }
   } else {
     res.status(405).json({ message: "POSTメソッドでアクセスしてください。" });
