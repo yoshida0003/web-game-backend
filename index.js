@@ -4,12 +4,16 @@ import { Server } from "socket.io";
 import { v4 as uuidv4 } from "uuid";
 import cors from "cors";
 import { router as shogiRouter, initializeBoard } from "./shogi.js";
+import createRoomHandler from "./pages/api/createRoom.js";
+import joinRoomHandler from "./pages/api/joinRoom.js";
 import registerHandler from "./pages/api/register.js";
 import loginHandler from "./pages/api/login.js";
 import addNgWordHandler from "./pages/api/addNgWord.js"; 
 import importNgWordsHandler from "./pages/api/importNgWords.js"; 
 import verifyTokenHandler from "./pages/api/verifyToken.js";
-import { assignNgWords } from "./pages/api/ngWord.js";
+import startNgWordGameHandler from "./pages/api/startNgWordGame.js";
+import setTimerHandler from "./pages/api/setTimer.js";
+import clickWordHandler from "./pages/api/clickWord.js";
 import dotenv from "dotenv";
 
 // 環境変数の読み込み
@@ -49,70 +53,13 @@ app.post("/api/importNgWords", importNgWordsHandler);
 app.post("/api/verify-token", verifyTokenHandler);
 
 // ルーム作成エンドポイント
-app.post("/api/create-room", function (req, res) {
-  const { roomName, username, gameType } = req.body;
-  const roomId = uuidv4().substring(0, 6);
-  const userId = uuidv4().substring(0, 6);
-
-  // ユーザーオブジェクトを作成
-  const user = {
-    id: userId,
-    username,
-    ...(gameType === "ng-word" && { points: 0 }), // gameTypeがng-wordの場合のみpointsを追加
-  };
-
-  // 部屋を作成
-  rooms[roomId] = {
-    roomName,
-    gameType,
-    users: [user],
-    gameStarted: false,
-  };
-
-  res.json({ roomId, userId });
-  io.to(roomId).emit("user-joined", { userId, username });
-  console.log(`${username}さんが部屋${roomId}に入室しました。`);
+app.post("/api/create-room", (req, res) => {
+  createRoomHandler(req, res, rooms, io);
 });
 
 // ルーム参加エンドポイント
-app.post("/api/join-room", function (req, res) {
-  const { roomName, username, gameType } = req.body;
-
-  const roomId = Object.keys(rooms).find(
-    (roomId) =>
-      rooms[roomId].roomName === roomName && rooms[roomId].gameType === gameType
-  );
-
-  if (roomId) {
-    const room = rooms[roomId];
-
-    if (room.gameType === "shogi" && room.users.length >= 2) {
-      return res.status(403).json({ message: "部屋がいっぱいです" });
-    }
-
-    if (room.gameType === "ng-word" && room.users.length >= 6) {
-      return res.status(403).json({ message: "NGワードの部屋がいっぱいです" });
-    }
-
-    let userId;
-    do {
-      userId = uuidv4().substring(0, 6); // 新しいuserIdを生成
-    } while (room.users.some((user) => user.id === userId)); // 重複を防ぐ
-
-    const user = {
-      id: userId,
-      username,
-      ...(gameType === "ng-word" && { points: 0 }), // gameTypeがng-wordの場合のみpointsを追加
-    };
-
-    room.users.push(user);
-    res.json({ roomId, userId });
-
-    io.to(roomId).emit("user-joined", { userId, username });
-    console.log(`${username}さんが部屋${roomId}に入室しました。`);
-  } else {
-    res.status(404).json({ message: "Room not found" });
-  }
+app.post("/api/join-room", (req, res) => {
+  joinRoomHandler(req, res, rooms, io);
 });
 
 // ルーム退出エンドポイント
@@ -154,7 +101,7 @@ app.get("/api/room/:roomId", function (req, res) {
   }
 });
 
-// ゲーム開始のエンドポイント
+// 将棋のゲーム開始のエンドポイント
 app.post("/api/start-game", function (req, res) {
   const { roomId } = req.body;
   const room = rooms[roomId];
@@ -191,119 +138,53 @@ app.post("/api/start-game", function (req, res) {
 app.use("/api/shogi", shogiRouter);
 
 // NGワードのゲーム開始のエンドポイント
-app.post("/api/start-ng-word-game", async function (req, res) {
-  const { roomId } = req.body;
-  const room = rooms[roomId];
-
-  if (room && room.users.length >= 2) {
-    room.gameStarted = true;
-
-    // 部屋のユーザーIDをログに出力
-    console.log(`部屋${roomId}のNGワードゲームを開始しました!`);
-    console.log(
-      `部屋のユーザーID: ${room.users.map((user) => user.id).join(", ")}`
-    );
-
-    try {
-      // ユーザーIDを取得
-      const userIds = room.users.map((user) => user.id);
-      console.log(userIds);
-
-      // NGワードを割り振る
-      const assignments = await assignNgWords(roomId, userIds);
-      console.log("割り振られたNGワード:", assignments);
-
-      // 割り振られたNGワードを各ユーザーに保存
-      room.users = room.users.map((user) => ({
-        ...user,
-        ngWord: assignments.find((assignment) => assignment.userId === user.id)
-          ?.word,
-      }));
-
-      // クライアントに通知
-      io.to(roomId).emit("ng-word-game-started", {
-        message: "NGワードゲームが開始されました！",
-        users: room.users,
-        assignments,
-      });
-
-      // タイマーを開始
-      let countdown = 60;
-      const interval = setInterval(() =>{
-        countdown -= 1;
-        io.to(roomId).emit("timer-update", { countdown });
-
-        if (countdown <= 0) {
-          clearInterval(interval);
-          io.to(roomId).emit("game-ended", { message: "ゲーム終了" });
-          room.gameStarted = false;
-
-          // 最終的なポイントを計算して勝者を決定
-          const winner = room.users.reduce((prev, curr) => 
-            prev.points < curr.points ? prev : curr
-          );
-          io.to(roomId).emit("game-result", {
-            message: `${winner.username}の勝ちです！`,
-            users: room.users,
-          });
-        }
-      }, 1000);
-
-      res.json({ message: "NGワードゲームが開始されました", assignments });
-    } catch (error) {
-      console.error(
-        `部屋${roomId}のNGワード割り振り中にエラーが発生しました:`,
-        error
-      );
-      res
-        .status(500)
-        .json({
-          message: "NGワードの割り振り中にエラーが発生しました",
-          error: error.message,
-        });
-    }
-  } else {
-    res.status(400).json({ message: "ゲームを開始するには2人以上が必要です" });
-  }
+app.post("/api/start-ng-word-game", (req, res) => {
+  startNgWordGameHandler(req, res, rooms, io);
 });
 
-app.post("/api/click-word", async function (req, res) {
-  const { roomId, targetUserId } = req.body;
+// クリックワードエンドポイント
+app.post("/api/click-word", (req, res) => {
+  clickWordHandler(req, res, rooms, io);
+});
+
+app.post("/api/toggle-ready", function (req, res) {
+  console.log("リクエスト受信: /api/toggle-ready", req.body);
+
+  const { roomId, userId } = req.body;
   const room = rooms[roomId];
 
   if (room) {
-    const targetUser = room.users.find((user) => user.id === targetUserId);
+    const user = room.users.find((user) => user.id === userId);
 
-    if (targetUser) {
-      // ポイントを+1（未定義の場合は0からスタート）
-      targetUser.points = (targetUser.points || 0) + 1;
-
-      // 新しいNGワードを割り当てる
-      const newWord = await assignNgWords(roomId, [targetUserId]);
-      targetUser.ngWord = newWord[0]?.word || "未設定";
-
-      // ログにクリックされたユーザーIDと全員のポイントを出力
-      console.log(`🔹 ${targetUserId} がクリックされました。`);
-      console.log("🔹 現在のポイント:");
-      room.users.forEach((user) => {
-        console.log(
-          `  - ${user.username} (ID: ${user.id}): ${user.points}ポイント`
-        );
+    if (user) {
+      user.isReady = !user.isReady; // 準備状態を切り替える
+      io.to(roomId).emit("user-ready-updated", {
+        userId,
+        isReady: user.isReady,
       });
 
-      io.to(roomId).emit("word-clicked", {
-        targetUserId,
-        points: targetUser.points,
-        newWord: targetUser.ngWord,
-      });
+      // 全員が準備完了しているか確認
+      const allReady = room.users
+        .filter((u) => u.id !== room.users[0].id) // 部屋製作者以外
+        .every((u) => u.isReady);
 
-      res.json({ message: "ポイントが更新されました", targetUser });
+      console.log(`全員準備完了: ${allReady}`); // デバッグログ
+      io.to(roomId).emit("all-users-ready", { allReady });
+
+      res.json({ message: "準備状態が更新されました", allReady });
     } else {
-      res.status(404).json({ message: "対象のユーザーが見つかりません" });
+      console.log(`ユーザー${userId}が見つかりません`);
+      res.status(404).json({ message: "ユーザーが見つかりません" });
     }
   } else {
+    console.log(`部屋${roomId}が見つかりません`);
     res.status(404).json({ message: "部屋が見つかりません" });
   }
+});
+
+// タイマー設定エンドポイント
+app.post("/api/set-timer", (req, res) => {
+  setTimerHandler(req, res, rooms, io);
 });
 
 // Socket.ioのイベント処理
@@ -312,7 +193,37 @@ io.on("connection", (socket) => {
     socket.join(roomId);
     socket.roomId = roomId;
     socket.userId = userId;
+
     console.log(`🔹 ${username} さんが部屋 ${roomId} に参加しました`);
+
+    // 部屋が存在しない場合は初期化
+    if (!rooms[roomId]) {
+      rooms[roomId] = {
+        users: [],
+        gameType: null, // ゲームタイプを初期化
+        userSocketMap: {}, // ユーザー ID と Socket ID のマッピング
+      };
+    }
+
+    const room = rooms[roomId];
+
+    // ユーザーが既に部屋に存在するか確認
+    const existingUser = room.users.find((user) => user.id === userId);
+    if (!existingUser) {
+      // ユーザーを部屋に追加
+      room.users.push({ id: userId, username });
+    } else {
+      console.log(`🔹 ユーザー ${username} は既に部屋 ${roomId} に存在します`);
+    }
+
+    // ゲームタイプが ng-word の場合のみマッピングを更新
+    if (room.gameType === "ng-word") {
+      if (!room.userSocketMap) {
+        room.userSocketMap = {}; // userSocketMap を初期化
+      }
+      room.userSocketMap[userId] = socket.id;
+      console.log(`🔹 User ${userId} is mapped to Socket ID: ${socket.id}`);
+    }
 
     io.to(roomId).emit("user-joined", { userId, username });
   });
@@ -342,6 +253,9 @@ io.on("connection", (socket) => {
 
     // 部屋が空になった場合、削除
     if (room.users.length === 0) {
+      if (room.gameType === "ng-word" && room.timer) {
+        clearInterval(room.timer); // タイマーを停止
+      }
       delete rooms[roomId];
       console.log(`🗑 部屋 ${roomId} を削除しました`);
     }
