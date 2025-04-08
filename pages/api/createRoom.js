@@ -1,9 +1,11 @@
 import { v4 as uuidv4 } from "uuid";
 
 export default function createRoomHandler(req, res, rooms, io) {
-  const { roomName, username, gameType } = req.body;
+  const { roomName, username, gameType, userId: providedUserId } = req.body;
+
+  // userIdが提供されていればそれを使用し、なければ新しいuserIdを生成
+  const userId = providedUserId || uuidv4().substring(0, 6);
   const roomId = uuidv4().substring(0, 6);
-  const userId = uuidv4().substring(0, 6);
 
   // ユーザーオブジェクトを作成
   const user = {

@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 export default function joinRoomHandler(req, res, rooms, io) {
-  const { roomName, username, gameType } = req.body;
+  const { roomName, username, gameType, userId: providedUserId } = req.body;
 
   const roomId = Object.keys(rooms).find(
     (roomId) =>
@@ -19,10 +19,13 @@ export default function joinRoomHandler(req, res, rooms, io) {
       return res.status(403).json({ message: "NGワードの部屋がいっぱいです" });
     }
 
-    let userId;
-    do {
-      userId = uuidv4().substring(0, 6); // 新しいuserIdを生成
-    } while (room.users.some((user) => user.id === userId)); // 重複を防ぐ
+    // userIdが提供されていればそれを使用し、なければ新しいuserIdを生成
+    let userId = providedUserId;
+    if (!userId) {
+      do {
+        userId = uuidv4().substring(0, 6); // 新しいuserIdを生成
+      } while (room.users.some((user) => user.id === userId)); // 重複を防ぐ
+    }
 
     const user = {
       id: userId,
